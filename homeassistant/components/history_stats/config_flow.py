@@ -26,6 +26,8 @@ from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
+    StateClassSelector,
+    StateClassSelectorConfig,
     StateSelector,
     StateSelectorConfig,
     TemplateSelector,
@@ -142,12 +144,8 @@ def _get_options_schema_with_entity_id(entity_id: str, type: str) -> vol.Schema:
             vol.Optional(CONF_DURATION): DurationSelector(
                 DurationSelectorConfig(enable_day=True, allow_negative=False),
             ),
-            vol.Optional(CONF_STATE_CLASS): SelectSelector(
-                SelectSelectorConfig(
-                    options=state_class_options,
-                    translation_key=CONF_STATE_CLASS,
-                    mode=SelectSelectorMode.DROPDOWN,
-                ),
+            vol.Optional(CONF_STATE_CLASS): StateClassSelector(
+                StateClassSelectorConfig(state_classes=state_class_options),
             ),
             vol.Optional(SECTION_ADDITIONAL_SETTINGS): section(
                 vol.Schema(
@@ -189,7 +187,7 @@ OPTIONS_FLOW = {
 class HistoryStatsConfigFlowHandler(SchemaConfigFlowHandler, domain=DOMAIN):
     """Handle a config flow for History stats."""
 
-    MINOR_VERSION = 4
+    VERSION = 2
 
     config_flow = CONFIG_FLOW
     options_flow = OPTIONS_FLOW
@@ -307,12 +305,10 @@ async def ws_start_preview(
     coordinator = HistoryStatsUpdateCoordinator(hass, history_stats, None, name, True)
     await coordinator.async_refresh()
     preview_entity = HistoryStatsSensor(
-        hass,
         coordinator=coordinator,
         sensor_type=sensor_type,
         name=name,
         unique_id=None,
-        source_entity_id=entity_id,
         state_class=state_class,
     )
     preview_entity.hass = hass
