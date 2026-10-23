@@ -4,9 +4,12 @@ from datetime import UTC, date, datetime
 from typing import Any
 from unittest.mock import MagicMock, Mock
 
+from caldav.calendarobjectresource import Todo
 from caldav.lib.error import DAVError, NotFoundError
-from caldav.objects import Todo
+from caldav.lib.url import URL
 import pytest
+from pytest_homeassistant.common import MockConfigEntry
+from pytest_homeassistant.typing import WebSocketGenerator
 
 from homeassistant.components.todo import (
     ATTR_DESCRIPTION,
@@ -21,9 +24,6 @@ from homeassistant.components.todo import (
 from homeassistant.const import ATTR_ENTITY_ID, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-
-from tests.common import MockConfigEntry
-from tests.typing import WebSocketGenerator
 
 CALENDAR_NAME = "My Tasks"
 ENTITY_NAME = "My tasks"
@@ -65,6 +65,18 @@ UID:3
 DTSTAMP:20231125T000000Z
 SUMMARY:Wine
 STATUS:COMPLETED
+END:VTODO
+END:VCALENDAR"""
+
+TODO_COMPLETED_AT = """BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//E-Corp.//CalDAV Client//EN
+BEGIN:VTODO
+UID:3
+DTSTAMP:20231125T000000Z
+SUMMARY:Wine
+STATUS:COMPLETED
+COMPLETED:20231125T120000Z
 END:VTODO
 END:VCALENDAR"""
 
@@ -121,8 +133,10 @@ def mock_supported_components() -> list[str]:
 def mock_calendar(supported_components: list[str]) -> Mock:
     """Fixture to create the primary calendar for the test."""
     calendar = Mock()
+    calendar.client = None
+    calendar.url = URL("https://example.com/calendar/")
     calendar.search = MagicMock(return_value=[])
-    calendar.name = CALENDAR_NAME
+    calendar.get_display_name = MagicMock(return_value=CALENDAR_NAME)
     calendar.get_supported_components = MagicMock(return_value=supported_components)
     return calendar
 
@@ -211,6 +225,48 @@ async def test_todo_list_state(
 
 
 @pytest.mark.parametrize(
+    ("todos", "expected_item"),
+    [
+        (
+            [TODO_COMPLETED_AT],
+            {
+                "uid": "0",
+                "summary": "Wine",
+                "status": "completed",
+                "completed": "2023-11-25T06:00:00-06:00",
+            },
+        ),
+        (
+            [TODO_COMPLETED],
+            {"uid": "0", "summary": "Wine", "status": "completed"},
+        ),
+        (
+            [TODO_COMPLETED_AT.replace("STATUS:COMPLETED", "STATUS:NEEDS-ACTION")],
+            {"uid": "0", "summary": "Wine", "status": "needs_action"},
+        ),
+    ],
+    ids=["completed_at", "no_completed", "reopened"],
+)
+async def test_completed(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    expected_item: dict[str, Any],
+) -> None:
+    """Test the time a to-do item was completed is read from the server."""
+    await hass.config_entries.async_setup(config_entry.entry_id)
+
+    result = await hass.services.async_call(
+        TODO_DOMAIN,
+        TodoServices.GET_ITEMS,
+        {},
+        target={ATTR_ENTITY_ID: TEST_ENTITY},
+        blocking=True,
+        return_response=True,
+    )
+    assert result == {TEST_ENTITY: {"items": [expected_item]}}
+
+
+@pytest.mark.parametrize(
     ("supported_components", "has_entity"),
     [([], False), (["VTODO"], True), (["VEVENT"], False), (["VEVENT", "VTODO"], True)],
 )
@@ -292,9 +348,11 @@ async def test_add_item(
         target={ATTR_ENTITY_ID: TEST_ENTITY},
         blocking=True,
     )
+    # Wait for the fire-and-forget state refresh
+    await hass.async_block_till_done()
 
-    assert calendar.save_todo.call_args
-    assert calendar.save_todo.call_args.kwargs == expcted_save_args
+    assert calendar.add_todo.call_args
+    assert calendar.add_todo.call_args.kwargs == expcted_save_args
 
     # Verify state was updated
     state = hass.states.get(TEST_ENTITY)
@@ -310,7 +368,7 @@ async def test_add_item_failure(
     """Test failure when adding an item to the list."""
     await hass.config_entries.async_setup(config_entry.entry_id)
 
-    calendar.save_todo.side_effect = DAVError()
+    calendar.add_todo.side_effect = DAVError()
 
     with pytest.raises(HomeAssistantError, match="CalDAV save error"):
         await hass.services.async_call(
@@ -504,7 +562,7 @@ async def test_update_item(
     assert state
     assert state.state == "1"
 
-    calendar.todo_by_uid = MagicMock(return_value=item)
+    calendar.get_todo_by_uid = MagicMock(return_value=item)
 
     dav_client.put.return_value.status = 204
 
@@ -518,6 +576,8 @@ async def test_update_item(
         target={ATTR_ENTITY_ID: TEST_ENTITY},
         blocking=True,
     )
+    # Wait for the fire-and-forget state refresh
+    await hass.async_block_till_done()
 
     assert dav_client.put.call_args
     ics = dav_client.put.call_args.args[1]
@@ -551,7 +611,7 @@ async def test_update_item_failure(
 
     await hass.config_entries.async_setup(config_entry.entry_id)
 
-    calendar.todo_by_uid = MagicMock(return_value=item)
+    calendar.get_todo_by_uid = MagicMock(return_value=item)
     dav_client.put.side_effect = DAVError()
 
     with pytest.raises(HomeAssistantError, match="CalDAV save error"):
@@ -586,7 +646,7 @@ async def test_update_item_lookup_failure(
 
     await hass.config_entries.async_setup(config_entry.entry_id)
 
-    calendar.todo_by_uid.side_effect = side_effect
+    calendar.get_todo_by_uid.side_effect = side_effect
 
     with pytest.raises(HomeAssistantError, match=match):
         await hass.services.async_call(
@@ -638,7 +698,7 @@ async def test_remove_item(
             return item1
         return item2
 
-    calendar.todo_by_uid = Mock(side_effect=lookup)
+    calendar.get_todo_by_uid = Mock(side_effect=lookup)
     item1.delete = Mock()
     item2.delete = Mock()
 
@@ -672,7 +732,7 @@ async def test_remove_item_lookup_failure(
 
     await hass.config_entries.async_setup(config_entry.entry_id)
 
-    calendar.todo_by_uid.side_effect = side_effect
+    calendar.get_todo_by_uid.side_effect = side_effect
 
     with pytest.raises(HomeAssistantError, match=match):
         await hass.services.async_call(
@@ -700,7 +760,7 @@ async def test_remove_item_failure(
     def lookup(uid: str) -> Mock:
         return item
 
-    calendar.todo_by_uid = Mock(side_effect=lookup)
+    calendar.get_todo_by_uid = Mock(side_effect=lookup)
     dav_client.delete.return_value.status = 500
 
     with pytest.raises(HomeAssistantError, match="CalDAV delete error"):
@@ -729,7 +789,7 @@ async def test_remove_item_not_found(
     def lookup(uid: str) -> Mock:
         return item
 
-    calendar.todo_by_uid.side_effect = NotFoundError()
+    calendar.get_todo_by_uid.side_effect = NotFoundError()
 
     with pytest.raises(HomeAssistantError, match="Could not find"):
         await hass.services.async_call(
@@ -778,7 +838,7 @@ async def test_subscribe(
     assert items[0]["status"] == "needs_action"
     assert items[0]["uid"]
 
-    calendar.todo_by_uid = MagicMock(return_value=item)
+    calendar.get_todo_by_uid = MagicMock(return_value=item)
     dav_client.put.return_value.status = 204
     # Reflect update for state refresh after update
     calendar.search.return_value = [
@@ -796,13 +856,17 @@ async def test_subscribe(
         target={ATTR_ENTITY_ID: TEST_ENTITY},
         blocking=True,
     )
+    await hass.async_block_till_done()
 
-    # Verify update is published
-    msg = await client.receive_json()
-    assert msg["id"] == subscription_id
-    assert msg["type"] == "event"
-    items = msg["event"].get("items")
-    assert items
+    # An earlier state write may re-publish the pre-update list; read until the
+    # refreshed item arrives.
+    items = []
+    while not items or items[0]["summary"] != "Milk":
+        msg = await client.receive_json()
+        assert msg["id"] == subscription_id
+        assert msg["type"] == "event"
+        items = msg["event"].get("items")
+
     assert len(items) == 1
     assert items[0]["summary"] == "Milk"
     assert items[0]["status"] == "needs_action"

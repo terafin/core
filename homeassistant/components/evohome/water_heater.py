@@ -5,8 +5,12 @@ import logging
 from typing import Any, override
 
 import evohomeasync2 as evo
-from evohomeasync2.const import SZ_STATE_STATUS, SZ_TEMPERATURE_STATUS
-from evohomeasync2.schemas.const import DhwState as EvoDhwState, ZoneMode as EvoZoneMode
+from evohomeasync2.const import (
+    SZ_STATE_STATUS,
+    SZ_TEMPERATURE_STATUS,
+    DhwState as EvoDhwState,
+    ZoneMode as EvoZoneMode,
+)
 
 from homeassistant.components.water_heater import (
     WaterHeaterEntity,
@@ -74,7 +78,7 @@ class EvoDHW(EvoChild, WaterHeaterEntity):
         | WaterHeaterEntityFeature.ON_OFF
         | WaterHeaterEntityFeature.OPERATION_MODE
     )
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
 
     _evo_device: evo.HotWater
     _evo_id_attr = "dhw_id"
