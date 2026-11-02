@@ -1022,6 +1022,9 @@
         "weather_alerts",
         "diy_makers"
       ],
+      "connectivity": [
+        "mqtt"
+      ],
       "config_flow": false,
       "iot_class": "local_push"
     },
@@ -2741,6 +2744,9 @@
         "water.meters_leak_detection",
         "water.water_treatment"
       ],
+      "connectivity": [
+        "mqtt"
+      ],
       "config_flow": true,
       "iot_class": "local_push"
     },
@@ -2780,6 +2786,9 @@
       "integration_type": "device",
       "categories": [
         "energy.meters_monitoring"
+      ],
+      "connectivity": [
+        "mqtt"
       ],
       "config_flow": true,
       "iot_class": "local_push"
@@ -4896,6 +4905,9 @@
       "categories": [
         "energy.ev_charging"
       ],
+      "connectivity": [
+        "mqtt"
+      ],
       "config_flow": true,
       "iot_class": "local_push"
     },
@@ -5946,6 +5958,9 @@
       "integration_type": "hub",
       "categories": [
         "hubs_protocols.building_automation"
+      ],
+      "connectivity": [
+        "mqtt"
       ],
       "config_flow": true,
       "iot_class": "local_push",
@@ -8165,6 +8180,9 @@
           "categories": [
             "diy_makers"
           ],
+          "connectivity": [
+            "mqtt"
+          ],
           "name": "MQTT"
         },
         "mqtt_eventstream": {
@@ -8173,6 +8191,9 @@
           "iot_class": "local_polling",
           "categories": [
             "diy_makers"
+          ],
+          "connectivity": [
+            "mqtt"
           ],
           "name": "MQTT Eventstream"
         },
@@ -8184,6 +8205,9 @@
             "presence_location.trackers",
             "diy_makers"
           ],
+          "connectivity": [
+            "mqtt"
+          ],
           "name": "MQTT JSON"
         },
         "mqtt_room": {
@@ -8194,6 +8218,9 @@
             "presence_location",
             "diy_makers"
           ],
+          "connectivity": [
+            "mqtt"
+          ],
           "name": "MQTT room presence"
         },
         "mqtt_statestream": {
@@ -8202,6 +8229,9 @@
           "iot_class": "local_push",
           "categories": [
             "diy_makers"
+          ],
+          "connectivity": [
+            "mqtt"
           ],
           "name": "MQTT Statestream"
         }
@@ -9658,6 +9688,9 @@
         "plugs_switches",
         "blinds_curtains"
       ],
+      "connectivity": [
+        "mqtt"
+      ],
       "config_flow": true,
       "iot_class": "local_push",
       "single_config_entry": true
@@ -10270,6 +10303,9 @@
       "integration_type": "hub",
       "categories": [
         "hubs_protocols.building_automation"
+      ],
+      "connectivity": [
+        "mqtt"
       ],
       "config_flow": true,
       "iot_class": "local_push"
@@ -11539,6 +11575,9 @@
       "categories": [
         "energy.ev_charging"
       ],
+      "connectivity": [
+        "mqtt"
+      ],
       "config_flow": true,
       "iot_class": "local_push"
     },
@@ -12704,6 +12743,9 @@
       "categories": [
         "diy_makers",
         "plugs_switches"
+      ],
+      "connectivity": [
+        "mqtt"
       ],
       "config_flow": true,
       "iot_class": "local_push"
